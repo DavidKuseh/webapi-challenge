@@ -11,12 +11,14 @@ router.get('/', (req, res) => {
         })
 });
 
-router.get
+router.get('/:id', validateProjectId, (req, res) => {
+    res.status(200).json(req.project)
+})
 
 router.post("/", validateProject, (req, res) => {
-    Projects.insert(req.body)
-        .then(user => {
-            res.status(201).json(user);
+    Projects.insert({ name: req.body.name, description: req.body.description })
+        .then(project => {
+            res.status(201).json(project);
         })
         .catch(err => {
             res
@@ -25,7 +27,7 @@ router.post("/", validateProject, (req, res) => {
         });
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', validateProjectId, (req, res) => {
     Projects.remove(req.params.id)
         .then(data => {
             if (data) {
@@ -39,7 +41,7 @@ router.delete('/:id', (req, res) => {
         })
 });
 
-router.put('/:id', validateProject, (req, res) => {
+router.put('/:id', validateProject, validateProjectId, (req, res) => {
     Projects.update(req.params.id, req.body)
         .then(project => {
             if (project) {
@@ -53,30 +55,17 @@ router.put('/:id', validateProject, (req, res) => {
         })
 });
 
-router.post('/:id/actions', validateAction, (req, res) => {
-    const info = { ...req.body, project_id: req.params.id };
-    Projects.getProjectActions(req.params.id)
-    .then(actions => {
-        if (actions[0]) {
-            Actions.insert(info)
-            .then(action => {
-                if (action) {
-                    res.status(201).json(action);
-                } else {
-                    res.status(404).json({message: 'Error retrieving project'})
-                }
-            })
-            .catch(error => {
-                res.status(500).json({message: 'Error creating project action'})
-            })
-        } else {
-            res.status(404).json({message: 'Error retrieving project'})
-        }
-    })
-    .catch(error => {
-        res.status(500).json({message:'Error retrieving actions for post'})
-    })
-})
+router.post('/:id/actions', validateProjectId, validateAction, (req, res) => {
+    const { id } = req.params;
+    const newAction = { ...req.body, project_id: id };
+    Actions.insert(newAction)
+        .then(action => {
+            res.status(201).json(action);
+        })
+        .catch(error => {
+            res.status(500).json({ error: 'Error creating an action for the project' })
+        })
+});
 
 //custom middleware
 // validate body of request to create a new action
@@ -105,4 +94,19 @@ function validateProject(req, res, next) {
     }
 };
 
+// validate id of project
+function validateProjectId(req, res, next) {
+    Projects.get(req.params.id)
+        .then(project => {
+            if (!project) {
+                res.status(400).json({ message: 'invalid project ID' })
+            } else {
+                req.project = project;
+                next();
+            }
+        })
+        .catch(error => {
+            res.status(500).json({ message: 'encountered an error validating project ID' })
+        })
+};
 module.exports = router; 
